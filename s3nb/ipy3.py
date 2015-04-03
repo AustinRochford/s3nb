@@ -216,8 +216,6 @@ class S3ContentsManager(ContentsManager):
         k = self.bucket.get_key(key)
         return k is not None and not k.name.endswith(self.s3_key_delimiter)
 
-    exists = file_exists
-
     def new_untitled(self, path='', type='', ext=''):
         self.log.debug('new_untitled: {}'.format(locals()))
         model = {
@@ -254,6 +252,17 @@ class S3ContentsManager(ContentsManager):
             'path': path,
         })
         return self.new(model, path)
+
+    def _save_directory(self, path):
+        self.log.debug('_save_directory: {}'.format(locals()))
+
+        k = boto.s3.key.Key(self.bucket)
+        k.key = self._path_to_s3_key_dir(path)
+
+        try:
+            k.set_contents_from_string('')
+        except Exception as e:
+            raise web.HTTPError(400, u"Unexpected Error Creating Directory: %s %s" % (path, e))
 
     def _save_file(self, path, content, format):
         if format != 'text':
@@ -318,7 +327,7 @@ class S3ContentsManager(ContentsManager):
         elif model['type'] == 'file':
             self._save_file(path, model['content'], model.get('format'))
         elif model['type'] == 'directory':
-            pass  # keep symmetry with filemanager.save
+            self._save_directory(path)
         else:
             raise web.HTTPError(400, "Unhandled contents type: %s" % model['type'])
 
